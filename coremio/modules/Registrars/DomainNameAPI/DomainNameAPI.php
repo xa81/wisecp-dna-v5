@@ -464,7 +464,7 @@ class DomainNameAPI extends \RegistrarModule
      */
     public function renewal($options = [], $domain = '', $sld = '', $tld = '', $year = 1, $oduedate = '', $nduedate = '')
     {
-        $domain = $domain !== '' ? $this->dnaAscii((string) $domain) : $this->dnaDomain();
+        $domain = $this->dnaRenewalDomain($options, $domain);
         $year   = max(1, (int) $year);
         $api    = $this->dnaClient();
 
@@ -1120,6 +1120,28 @@ class DomainNameAPI extends \RegistrarModule
         }
 
         return $this->dnaAscii(trim($domain));
+    }
+
+    /**
+     * The domain renewal() works on. BUG-11017: the core can pass $domain as false with the
+     * name only in $options, and (string) false is '' — which the gateway rejects with
+     * "The DomainName field is required" before the request is even logged.
+     */
+    private function dnaRenewalDomain($options, $domain): string
+    {
+        $domain = is_string($domain) ? trim($domain) : '';
+
+        if ($domain === '' && is_array($options)) {
+            $domain = is_string($options['domain'] ?? null) ? trim($options['domain']) : '';
+            $sld    = is_string($options['name'] ?? null) ? $options['name'] : '';
+            $tld    = is_string($options['tld'] ?? null) ? $options['tld'] : '';
+
+            if ($domain === '' && $sld !== '' && $tld !== '') {
+                $domain = $sld . '.' . ltrim($tld, '.');
+            }
+        }
+
+        return $domain !== '' ? $this->dnaAscii($domain) : $this->dnaDomain();
     }
 
     private function dnaAscii(string $domain): string
